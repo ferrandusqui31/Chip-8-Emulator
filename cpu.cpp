@@ -113,8 +113,7 @@ void Cpu::decode_0(unsigned short instr)
     case 0x00e0:
         // cls - clear the screen
         {
-            uint8_t *pixels = (uint8_t *)surface->pixels;
-            memset(pixels, 0, surface->pitch * surface->h);
+            memset(display, 0, 64 * 32 * sizeof(uint8_t));
             // render();
             break;
         }
@@ -383,10 +382,9 @@ void Cpu::display_sprite(unsigned char x, unsigned char y, unsigned char h)
         {
             const unsigned char bit = (byte >> (7 - j)) & 0x1; // Gets the bit for the position
             unsigned char x_fin = x + j, y_fin = y + i;
-            uint8_t *pixels = (uint8_t *)surface->pixels;
 
-            vreg[0xf] |= pixels[y_fin * surface->pitch + x_fin] & bit; // Collision detection
-            pixels[y_fin * surface->pitch + x_fin] = pixels[y_fin * surface->pitch + x_fin] ^ bit;
+            vreg[0xf] |= display[y_fin * 64 + x_fin] & bit; // Collision detection
+            display[y_fin * 64 + x_fin] = display[y_fin * 64 + x_fin] ^ bit;
             // screen[x + j][y + i] = screen[x + j][y + i] ^ bit;
         }
     }
@@ -450,6 +448,39 @@ int Cpu::cpu_main()
     }
 
     return 0;
+}
+
+SDL_Thread* Cpu::init(void *data, size_t data_size)
+{
+    memcpy(&mem[0x200], data, data_size);
+    SDL_free(data);
+    pc = 0x200;
+
+    memset(display, 0, 64*32*sizeof(uint8_t));
+
+    input_mutex = SDL_CreateMutex();
+    if (input_mutex == NULL)
+    {
+        SDL_Log("Error creating input mutex: %s", SDL_GetError());
+    }
+
+    // Creating cpu thread
+    CpuThreadPayload *payload = new CpuThreadPayload {this, Cpu::cpu_main};
+    SDL_Thread *new_thread = SDL_CreateThread(Cpu::genericThreadCallback, "CPU Thread", payload);
+    return new_thread;
+}
+
+void Cpu::stop()
+{
+    running = false;
+
+    delete timer_mutex;
+    delete input_mutex;
+}
+
+uint8_t *Cpu::getDisplay()
+{
+    return display;
 }
 
 int Cpu::timers_func()

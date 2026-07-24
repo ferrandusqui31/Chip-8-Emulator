@@ -1,16 +1,5 @@
 #include "window.hpp"
 
-void Window::init_emulator()
-{
-    init_screen();
-    SDL_ShowOpenFileDialog(load_rom_callback, this, NULL, NULL, 0, SDL_GetCurrentDirectory(), false);
-}
-
-void Window::init_screen()
-{
-    uint8_t* pixels = (uint8_t*)surface->pixels;
-    memset(pixels, 0, surface->pitch * surface->h);
-}
 
 void Window::init_window()
 {
@@ -21,22 +10,11 @@ void Window::init_window()
     palette = SDL_CreatePalette(2);
     SDL_SetPaletteColors(palette, colors, 0, 2);
 
-    surface = SDL_CreateSurface(64, 32, SDL_PIXELFORMAT_INDEX8);
-    SDL_SetSurfacePalette(surface, palette);
-
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STREAMING, 64, 32);
     SDL_SetTexturePalette(texture, palette);
     SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 }
 
-void Window::init_cpu()
-{
-    cpu = new Cpu();
-    CpuThreadPayload *payload = new CpuThreadPayload {cpu, Cpu::cpu_main};
-
-    cpu_thread = SDL_CreateThread(Cpu::genericThreadCallback, "CPU Thread", payload);
-
-}
 
 void SDLCALL Window::load_rom_callback(void *userdata, const char *const *filelist, int filter)
 {
@@ -65,19 +43,16 @@ void Window::load_rom(const char *const *filelist, int filter)
         exit(EXIT_FAILURE);
     }
 
-    memcpy(&mem[0x200], data, data_size);
-    SDL_free(data);
-    pc = 0x200;
-
-    input_mutex = SDL_CreateMutex();
-    
-    init_cpu();
+    cpu = new Cpu();
+    cpu_thread = cpu->init(data, data_size);
 }
 
 void Window::init()
 {
     init_window();
-    init_emulator();
+
+    // Init emulator
+    SDL_ShowOpenFileDialog(load_rom_callback, this, NULL, NULL, 0, SDL_GetCurrentDirectory(), false);
 }
 
 void Window::quit()
@@ -93,9 +68,8 @@ void Window::render()
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    SDL_UpdateTexture(texture, NULL, surface->pixels, surface->pitch);
+    SDL_UpdateTexture(texture, NULL, cpu->getDisplay(), 64 * sizeof(uint8_t));
     SDL_RenderTexture(renderer, texture, NULL, NULL);
-    
     SDL_RenderPresent(renderer);
 }
 
@@ -111,10 +85,10 @@ void Window::handleEvents()
             break;
 
         case SDL_EVENT_KEY_DOWN:
-            SDL_LockMutex(input_mutex);
-            if (awaiting_input)
+            SDL_LockMutex(cpu->input_mutex);
+            if (cpu->awaiting_input)
                 send_pressed_key(event);
-            SDL_UnlockMutex(input_mutex);
+            SDL_UnlockMutex(cpu->input_mutex);
             break;
         }
     }
@@ -125,68 +99,78 @@ void Window::send_pressed_key(SDL_Event event)
     switch (event.key.scancode)
     {
     case SDL_SCANCODE_1:
-        recieved_input = true;
-        key_pressed = 0x1;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x1;
         break;
     case SDL_SCANCODE_2:
-        recieved_input = true;
-        key_pressed = 0x2;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x2;
         break;
     case SDL_SCANCODE_3:
-        recieved_input = true;
-        key_pressed = 0x3;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x3;
         break;
     case SDL_SCANCODE_4:
-        recieved_input = true;
-        key_pressed = 0xc;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0xc;
         break;
     case SDL_SCANCODE_Q:
-        recieved_input = true;
-        key_pressed = 0x4;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x4;
         break;
     case SDL_SCANCODE_W:
-        recieved_input = true;
-        key_pressed = 0x5;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x5;
         break;
     case SDL_SCANCODE_E:
-        recieved_input = true;
-        key_pressed = 0x6;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x6;
         break;
     case SDL_SCANCODE_R:
-        recieved_input = true;
-        key_pressed = 0xd;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0xd;
         break;
     case SDL_SCANCODE_A:
-        recieved_input = true;
-        key_pressed = 0x7;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x7;
         break;
     case SDL_SCANCODE_S:
-        recieved_input = true;
-        key_pressed = 0x8;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x8;
         break;
     case SDL_SCANCODE_D:
-        recieved_input = true;
-        key_pressed = 0x9;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x9;
         break;
     case SDL_SCANCODE_F:
-        recieved_input = true;
-        key_pressed = 0xe;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0xe;
         break;
     case SDL_SCANCODE_Z:
-        recieved_input = true;
-        key_pressed = 0xa;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0xa;
         break;
     case SDL_SCANCODE_X:
-        recieved_input = true;
-        key_pressed = 0x0;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0x0;
         break;
     case SDL_SCANCODE_C:
-        recieved_input = true;
-        key_pressed = 0xb;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0xb;
         break;
     case SDL_SCANCODE_V:
-        recieved_input = true;
-        key_pressed = 0xf;
+        cpu->recieved_input = true;
+        cpu->key_pressed = 0xf;
         break;
     }
+}
+
+bool Window::isRunning()
+{
+    return running;
+}
+
+Cpu *Window::getCpu()
+{
+    return cpu;
 }
