@@ -47,53 +47,6 @@ void Window::load_rom(const char *const *filelist, int filter)
     cpu_thread = cpu->init(data, data_size);
 }
 
-void Window::init()
-{
-    init_window();
-
-    // Init emulator
-    SDL_ShowOpenFileDialog(load_rom_callback, this, NULL, NULL, 0, SDL_GetCurrentDirectory(), false);
-}
-
-void Window::quit()
-{
-    // Will have to kill al the threads (maybe with running bool is enough, idk)
-    running = false;
-
-    delete cpu;
-}
-
-void Window::render()
-{
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-    SDL_RenderClear(renderer);
-
-    SDL_UpdateTexture(texture, NULL, cpu->getDisplay(), 64 * sizeof(uint8_t));
-    SDL_RenderTexture(renderer, texture, NULL, NULL);
-    SDL_RenderPresent(renderer);
-}
-
-void Window::handleEvents()
-{
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        switch (event.type)
-        {
-        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            quit();
-            break;
-
-        case SDL_EVENT_KEY_DOWN:
-            SDL_LockMutex(cpu->input_mutex);
-            if (cpu->awaiting_input)
-                send_pressed_key(event);
-            SDL_UnlockMutex(cpu->input_mutex);
-            break;
-        }
-    }
-}
-
 void Window::send_pressed_key(SDL_Event event)
 {
     switch (event.key.scancode)
@@ -162,6 +115,55 @@ void Window::send_pressed_key(SDL_Event event)
         cpu->recieved_input = true;
         cpu->key_pressed = 0xf;
         break;
+    }
+}
+
+void Window::init()
+{
+    init_window();
+
+    // Init emulator
+    SDL_ShowOpenFileDialog(load_rom_callback, this, NULL, NULL, 0, SDL_GetCurrentDirectory(), false);
+}
+
+void Window::quit()
+{
+    // Will have to kill al the threads (maybe with running bool is enough, idk)
+    cpu->stop();
+    SDL_WaitThread(cpu_thread, NULL);
+    
+    delete cpu;
+    running = false;
+}
+
+void Window::render()
+{
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_UpdateTexture(texture, NULL, cpu->getDisplay(), 64 * sizeof(uint8_t));
+    SDL_RenderTexture(renderer, texture, NULL, NULL);
+    SDL_RenderPresent(renderer);
+}
+
+void Window::handleEvents()
+{
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
+    {
+        switch (event.type)
+        {
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            quit();
+            break;
+
+        case SDL_EVENT_KEY_DOWN:
+            SDL_LockMutex(cpu->input_mutex);
+            if (cpu->awaiting_input)
+                send_pressed_key(event);
+            SDL_UnlockMutex(cpu->input_mutex);
+            break;
+        }
     }
 }
 

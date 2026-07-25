@@ -392,97 +392,6 @@ void Cpu::display_sprite(unsigned char x, unsigned char y, unsigned char h)
     // render();
 }
 
-void Cpu::init_fonts()
-{
-    // Hope the compiler optimizes this mess
-    unsigned char font[] =
-        {
-            0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
-            0x20, 0x60, 0x20, 0x20, 0x70, // 1
-            0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
-            0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
-            0x90, 0x90, 0xF0, 0x10, 0x10, // 4
-            0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
-            0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
-            0xF0, 0x10, 0x20, 0x40, 0x40, // 7
-            0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
-            0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
-            0xF0, 0x90, 0xF0, 0x90, 0x90, // A
-            0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
-            0xF0, 0x80, 0x80, 0x80, 0xF0, // C
-            0xE0, 0x90, 0x90, 0x90, 0xE0, // D
-            0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
-            0xF0, 0x80, 0xF0, 0x80, 0x80  // F
-        };
-
-    const int fonts_size = 5 * 16;
-
-    for (int i = 0; i < fonts_size; i++)
-    {
-        mem[FONT_ADDRESS + i] = font[i];
-    }
-}
-
-int Cpu::cpu_main()
-{
-    init_fonts();
-    srand(time(NULL));
-
-    CpuThreadPayload *payload = new CpuThreadPayload {this, timers_func};
-    SDL_Thread *timers_thread = SDL_CreateThread(genericThreadCallback, "timers_thread", payload);
-
-    // Frequency should be 1MHz
-    static constexpr double PERIOD_NS = 1600000;
-
-    while (running)
-    {
-        Uint64 t0 = SDL_GetTicksNS();
-
-        unsigned short instr = fetch();
-        decode(instr);
-
-        Uint64 t1 = SDL_GetTicksNS();
-        double elapsed = static_cast<double>(t1 - t0);
-        if (elapsed < PERIOD_NS)
-            SDL_DelayNS(static_cast<Uint32>(PERIOD_NS - elapsed));
-    }
-
-    return 0;
-}
-
-SDL_Thread* Cpu::init(void *data, size_t data_size)
-{
-    memcpy(&mem[0x200], data, data_size);
-    SDL_free(data);
-    pc = 0x200;
-
-    memset(display, 0, 64*32*sizeof(uint8_t));
-
-    input_mutex = SDL_CreateMutex();
-    if (input_mutex == NULL)
-    {
-        SDL_Log("Error creating input mutex: %s", SDL_GetError());
-    }
-
-    // Creating cpu thread
-    CpuThreadPayload *payload = new CpuThreadPayload {this, Cpu::cpu_main};
-    SDL_Thread *new_thread = SDL_CreateThread(Cpu::genericThreadCallback, "CPU Thread", payload);
-    return new_thread;
-}
-
-void Cpu::stop()
-{
-    running = false;
-
-    delete timer_mutex;
-    delete input_mutex;
-}
-
-uint8_t *Cpu::getDisplay()
-{
-    return display;
-}
-
 int Cpu::timers_func()
 {
     // They run at 60Hz
@@ -512,12 +421,106 @@ int Cpu::timers_func()
 
 int SDLCALL Cpu::genericThreadCallback(void *data)
 {
-    CpuThreadPayload *payload = static_cast<CpuThreadPayload*>(data);
-    
+    CpuThreadPayload *payload = static_cast<CpuThreadPayload *>(data);
+
     Cpu *self = payload->self;
     int (Cpu::*method)() = payload->func;
-    
+
     delete payload;
 
     return (self->*method)();
+}
+
+void Cpu::init_fonts()
+{
+    // Hope the compiler optimizes this mess
+    // I don't make it static constexpr to avoid taking up unnecessary space (isn't much, but souldn't do it)
+    const unsigned char font[] =
+        {
+            0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+            0x20, 0x60, 0x20, 0x20, 0x70, // 1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+            0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+            0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+            0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+            0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+            0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+            0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+        };
+
+    const int fonts_size = 5 * 16;
+
+    for (int i = 0; i < fonts_size; i++)
+    {
+        mem[FONT_ADDRESS + i] = font[i];
+    }
+}
+
+Cpu::~Cpu()
+{
+    SDL_WaitThread(timers_thread, NULL);
+
+    SDL_DestroyMutex(input_mutex);
+    // Timer mutex destroyed by timer thread
+}
+
+int Cpu::cpu_main()
+{
+    init_fonts();
+    srand(time(NULL));
+
+    CpuThreadPayload *payload = new CpuThreadPayload{this, timers_func};
+    timers_thread = SDL_CreateThread(genericThreadCallback, "timers_thread", payload);
+
+    while (running)
+    {
+        Uint64 t0 = SDL_GetTicksNS();
+
+        unsigned short instr = fetch();
+        decode(instr);
+
+        Uint64 t1 = SDL_GetTicksNS();
+        double elapsed = static_cast<double>(t1 - t0);
+        if (elapsed < PERIOD_NS)
+            SDL_DelayNS(static_cast<Uint32>(PERIOD_NS - elapsed));
+    }
+
+    return 0;
+}
+
+SDL_Thread *Cpu::init(void *data, size_t data_size)
+{
+    memcpy(&mem[0x200], data, data_size);
+    SDL_free(data);
+    pc = 0x200;
+
+    memset(display, 0, 64 * 32 * sizeof(uint8_t));
+
+    input_mutex = SDL_CreateMutex();
+    if (input_mutex == NULL)
+    {
+        SDL_Log("Error creating input mutex: %s", SDL_GetError());
+    }
+
+    // Creating cpu thread
+    CpuThreadPayload *payload = new CpuThreadPayload{this, Cpu::cpu_main};
+    SDL_Thread *new_thread = SDL_CreateThread(Cpu::genericThreadCallback, "CPU Thread", payload);
+    return new_thread;
+}
+
+void Cpu::stop()
+{
+    running = false;
+}
+
+uint8_t *Cpu::getDisplay()
+{
+    return display;
 }

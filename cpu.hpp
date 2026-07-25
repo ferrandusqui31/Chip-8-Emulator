@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <atomic>
 #include <ctime>
 #include <random>
 #include <stack>
@@ -12,8 +13,18 @@
 class Cpu
 {
 private:
+    struct CpuThreadPayload
+    {
+        Cpu *self = nullptr;
+        int (Cpu::*func)();
+    };
+
+    std::atomic<bool> running = true;
     SDL_Mutex *timer_mutex = nullptr;
-    bool running = true;
+    SDL_Thread *timers_thread = nullptr;
+
+    // Frequency should be 1MHz
+    static constexpr double PERIOD_NS = 1600000;
 
     // 4K memory
     unsigned char mem[0xfff];
@@ -31,7 +42,7 @@ private:
     // Timers
     unsigned char delay_timer, sound_timer;
 
-    public:
+public:
     // Keypad
     SDL_Mutex *input_mutex = nullptr;
     bool awaiting_input = false;
@@ -41,7 +52,6 @@ private:
 private:
     unsigned short fetch();
     void decode(unsigned short instr);
-
     void decode_0(unsigned short instr);
     void decode_8(unsigned short instr);
     void decode_e(unsigned short instr);
@@ -49,25 +59,21 @@ private:
 
     SDL_Scancode getScanCode(unsigned char key);
     void display_sprite(unsigned char x, unsigned char y, unsigned char h);
+
+    int timers_func();
+    static int SDLCALL genericThreadCallback(void *data);
+
     void init_fonts();
 
 public:
+    ~Cpu();
+
     int cpu_main();
-    SDL_Thread* init(void *data, size_t data_size);
+    SDL_Thread *init(void *data, size_t data_size);
     void stop();
 
+    // Consultors
     uint8_t *getDisplay();
-
-private:
-    int timers_func();
-
-public:
-    static int SDLCALL genericThreadCallback(void *data);
 };
 
-struct CpuThreadPayload
-{
-    Cpu *self = nullptr;
-    int (Cpu::*func)();
-};
 #endif
