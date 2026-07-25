@@ -76,14 +76,8 @@ void Cpu::decode(unsigned short instr)
         I_reg = nnn;
         break;
     case 0xb:
-#ifdef ORIGINAL_CHIP
         // jmi nnn --- pc := V0 + nnn
         pc = vreg[0x0] + nnn;
-
-#else // SUPER_CHIP
-      // jmi vx, nnn !!! pc := VX + nnn
-        pc = vreg[x] + nnn;
-#endif
         break;
     case 0xc:
         // rand vx, nn --- vx := random number [0-255] & nn
@@ -113,7 +107,7 @@ void Cpu::decode_0(unsigned short instr)
     case 0x00e0:
         // cls - clear the screen
         {
-            memset(display, 0, 64 * 32 * sizeof(uint8_t));
+            memset(display, 0, BASE_WIDTH * BASE_HEIGHT * sizeof(uint8_t));
             // render();
             break;
         }
@@ -371,20 +365,20 @@ SDL_Scancode Cpu::getScanCode(unsigned char key)
 
 void Cpu::display_sprite(unsigned char x, unsigned char y, unsigned char h)
 {
-    x %= 64;
-    y %= 32;
+    x %= BASE_WIDTH;
+    y %= BASE_HEIGHT;
     vreg[0xf] = 0;
 
-    for (int i = 0; i < h && y + i < 32; i++)
+    for (int i = 0; i < h && y + i < BASE_HEIGHT; i++)
     {
         const unsigned char byte = mem[I_reg + i];
-        for (int j = 0; j < 8 && j + x < 64; j++)
+        for (int j = 0; j < 8 && j + x < BASE_WIDTH; j++)
         {
             const unsigned char bit = (byte >> (7 - j)) & 0x1; // Gets the bit for the position
             unsigned char x_fin = x + j, y_fin = y + i;
 
-            vreg[0xf] |= display[y_fin * 64 + x_fin] & bit; // Collision detection
-            display[y_fin * 64 + x_fin] = display[y_fin * 64 + x_fin] ^ bit;
+            vreg[0xf] |= display[y_fin * BASE_WIDTH + x_fin] & bit; // Collision detection
+            display[y_fin * BASE_WIDTH + x_fin] = display[y_fin * BASE_WIDTH + x_fin] ^ bit;
             // screen[x + j][y + i] = screen[x + j][y + i] ^ bit;
         }
     }
@@ -501,7 +495,7 @@ SDL_Thread *Cpu::init(void *data, size_t data_size)
     SDL_free(data);
     pc = 0x200;
 
-    memset(display, 0, 64 * 32 * sizeof(uint8_t));
+    memset(display, 0, BASE_WIDTH * BASE_HEIGHT * sizeof(uint8_t));
 
     input_mutex = SDL_CreateMutex();
     if (input_mutex == NULL)

@@ -10,7 +10,7 @@ void Window::init_window()
     palette = SDL_CreatePalette(2);
     SDL_SetPaletteColors(palette, colors, 0, 2);
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STREAMING, 64, 32);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STREAMING, BASE_WIDTH, BASE_HEIGHT);
     SDL_SetTexturePalette(texture, palette);
     SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 }
@@ -141,7 +141,7 @@ void Window::render()
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    SDL_UpdateTexture(texture, NULL, cpu->getDisplay(), 64 * sizeof(uint8_t));
+    SDL_UpdateTexture(texture, NULL, cpu->getDisplay(), BASE_WIDTH * sizeof(uint8_t));
     SDL_RenderTexture(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
 }

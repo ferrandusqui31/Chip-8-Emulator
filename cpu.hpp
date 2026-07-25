@@ -30,7 +30,7 @@ private:
     unsigned char mem[0xfff];
 
     // Display
-    uint8_t display[64 * 32];
+    uint8_t display[BASE_WIDTH * BASE_HEIGHT];
 
     // Registers
     unsigned char vreg[16];
