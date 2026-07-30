@@ -157,7 +157,7 @@ void Window::handleEvents()
             quit();
             break;
 
-        case SDL_EVENT_KEY_DOWN:
+        case SDL_EVENT_KEY_UP:
             SDL_LockMutex(cpu->input_mutex);
             if (cpu->awaiting_input)
                 send_pressed_key(event);
